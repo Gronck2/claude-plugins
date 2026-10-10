@@ -1,0 +1,15 @@
+{
+  "name": "dev-pipeline",
+  "displayName": "Dev pipeline",
+  "version": "0.2.0",
+  "description": "Subagent dev pipeline (manager, coder, tester, code-reviewer, qa-mr), the run-task skill and the setup-project skill. Project specifics come from a '## Pipeline contract' section in each project's CLAUDE.md.",
+  "author": {
+    "name": "Gronck"
+  },
+  "license": "MIT",
+  "keywords": [
+    "pipeline",
+    "agents",
+    "workflow"
+  ]
+}

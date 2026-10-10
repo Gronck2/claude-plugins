@@ -1,0 +1,12 @@
+{
+  "name": "gronck-local",
+  "description": "Personal plugins: the shared subagent dev pipeline",
+  "owner": { "name": "Gronck" },
+  "plugins": [
+    {
+      "name": "dev-pipeline",
+      "source": "./plugins/dev-pipeline",
+      "description": "manager -> coder -> tester || code-reviewer -> qa-mr pipeline, configured per project by a Pipeline contract in CLAUDE.md"
+    }
+  ]
+}
