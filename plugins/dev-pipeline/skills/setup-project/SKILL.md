@@ -24,12 +24,62 @@ show what you will change before writing anything that already exists.
   `git init` and stop until the user agrees), `git status`, current branch,
   local and remote branches (`git branch -a`), remotes (`git remote -v`), the
   forge (`gh repo view` / `glab repo view` if available).
-- Stack and tooling, to infer gate commands: `pyproject.toml` (uv/poetry/pip;
-  ruff, mypy, pytest), `package.json` (scripts: lint, format, typecheck, test;
-  pnpm/yarn/npm by lockfile), `go.mod`, `Cargo.toml`, `Makefile`/`justfile`
-  targets, CI workflows (`.github/workflows/*.yml`, `.gitlab-ci.yml`) — the CI
-  commands are the best source for the gate.
+- Stack and tooling: find every manifest from the stack table below, at the
+  root and in subdirectories (skip `node_modules`, `.venv`, `vendor`, `target`,
+  `build`, `dist`). Gate commands, in order of trust:
+  1. what CI already runs (`.github/workflows/*.yml`, `.gitlab-ci.yml`, other
+     CI configs) — copy those commands;
+  2. what the project declares: `package.json` scripts, `Makefile`/`justfile`
+     targets, `[tool.*]` sections and dev dependencies in `pyproject.toml`,
+     configured linters (`.eslintrc*`, `ruff.toml`, `.golangci.yml`, ...);
+  3. only then the stack table defaults, marked as guesses.
 - Test locations (`tests/`, `test/`, `**/*_test.go`, `**/*.test.ts`, ...).
+- Then classify the repo: **empty** (no manifest and no source files, see
+  step 1a), **single stack** (one manifest set at the root), or **monorepo**
+  (manifests in several subdirectories, workspaces such as
+  `pnpm-workspace.yaml`, `package.json` `workspaces`, Cargo/Go/uv workspaces,
+  or mixed stacks, see step 1b).
+
+### Stack table (defaults when the project declares nothing)
+
+| Marker | Stack | lint | format check | types | tests | test paths |
+|---|---|---|---|---|---|---|
+| `pyproject.toml` + `uv.lock` | Python (uv) | `uv run ruff check` | `uv run ruff format --check` | `uv run mypy` | `uv run pytest` | `tests/` |
+| `pyproject.toml` + `poetry.lock` | Python (Poetry) | `poetry run ruff check` | `poetry run ruff format --check` | `poetry run mypy` | `poetry run pytest` | `tests/` |
+| `requirements*.txt` / `setup.py` | Python (pip) | `ruff check` | `ruff format --check` | `mypy` | `pytest` | `tests/` |
+| `package.json` + `pnpm-lock.yaml` / `yarn.lock` / `package-lock.json` / `bun.lockb` | JS/TS (pnpm / yarn / npm / bun) | `<pm> run lint` | `<pm> run format:check` or `prettier --check .` | `tsc --noEmit` (if `tsconfig.json`) | `<pm> test` | `**/*.test.{ts,tsx,js}`, `**/*.spec.*`, `tests/` |
+| `go.mod` | Go | `golangci-lint run` (else `go vet ./...`) | `test -z "$(gofmt -l .)"` | (compiler) `go build ./...` | `go test ./...` | `**/*_test.go` |
+| `Cargo.toml` | Rust | `cargo clippy --all-targets -- -D warnings` | `cargo fmt --check` | (compiler) | `cargo test` | `tests/`, inline `#[cfg(test)]` |
+| `build.gradle(.kts)` / `pom.xml` | Java/Kotlin (Gradle / Maven) | `./gradlew check` / `mvn -q verify` (checkstyle, detekt, ktlint if configured) | spotless/ktlint check if configured | (compiler) | `./gradlew test` / `mvn test` | `src/test/` |
+| `*.sln` / `*.csproj` | .NET | `dotnet build -warnaserror` | `dotnet format --verify-no-changes` | (compiler) | `dotnet test` | `*Tests/` projects |
+| `Gemfile` | Ruby | `bundle exec rubocop` | (rubocop) | `bundle exec srb tc` if Sorbet | `bundle exec rspec` / `bin/rails test` | `spec/`, `test/` |
+| `composer.json` | PHP | `vendor/bin/phpstan analyse` / `vendor/bin/psalm` | `vendor/bin/php-cs-fixer fix --dry-run` | (phpstan) | `vendor/bin/phpunit` / `vendor/bin/pest` | `tests/` |
+
+A tool from the table that the project does not have is not a gate command:
+offer to add it (step 1a list) instead of writing a command that cannot run.
+Commands that take files (`<touched files>`) get the placeholder in the
+contract; whole-project commands (compilers, `cargo test`) don't.
+
+### 1a. Empty repo
+
+Nothing to infer: ask a short survey (AskUserQuestion, at most 4 questions in
+one call): language/stack; package manager; test framework; linter/formatter.
+Put the recommended set first, from the table: uv + ruff + mypy + pytest;
+pnpm + TypeScript + ESLint + Prettier + Vitest; Go modules + golangci-lint +
+`go test`; cargo + clippy + rustfmt; Gradle + JUnit 5 (+ ktlint); dotnet +
+xUnit; Bundler + RuboCop + RSpec; Composer + PHPStan + PHPUnit. Write the
+contract from the answers, marking that the tools are not installed yet, and
+offer (separately, as its own yes) to scaffold the minimal project files
+(manifest, lint/format config, one passing test, `.gitignore`) so that every
+gate command runs green before the first task. Don't install global tools.
+
+### 1b. Monorepo
+
+List the parts (directory → stack). Gate commands and test paths are given
+per part in the contract (format in step 2); a root-level command that already
+covers everything (e.g. `pnpm -r lint`, `turbo run test`, `nx affected`,
+`make check`) is preferred over per-part ones when CI uses it. Each part's
+commands state the working directory. Ask the user to confirm the part list.
 - Existing `CLAUDE.md` (and `AGENTS.md`), `docs/` layout, existing ADRs or
   task files and their numbering.
 - Project-level `.claude/agents/{manager,coder,tester,code-reviewer,qa-mr}.md`
@@ -76,6 +126,24 @@ otherwise:
 - **Merge/release policy:** <as agreed>
 - **Extra rules:** <reserved ports, processes not to touch, secrets handling,
   real-browser checks for front-end scripts, domain rules>
+```
+
+Monorepo form of the two per-part fields (other fields stay shared):
+
+```markdown
+- **Test paths:** backend/tests/, frontend/**/*.test.ts
+- **Gate commands** (per part; run a part's commands when the diff touches
+  files under its directory, from that directory; `<touched files>` are
+  relative to it):
+  - `backend/` (Python, uv):
+    - lint: `uv run ruff check <touched files>`
+    - types: `uv run mypy <touched files>`
+    - tests: `uv run pytest`
+  - `frontend/` (TS, pnpm):
+    - lint: `pnpm lint`
+    - types: `pnpm exec tsc --noEmit`
+    - tests: `pnpm test`
+  - root (always): `<root command, if any>`
 ```
 
 Verify each gate command actually runs before writing it in (run it once; if

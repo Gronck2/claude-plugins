@@ -15,6 +15,12 @@ directories or globs such as `tests/` or `**/*.test.ts`) and **Extra rules** (e.
 check and with which harness, reserved ports). If the section is missing, stop
 with `BLOCKED: CLAUDE.md has no Pipeline contract`.
 
+**Monorepo contracts.** If Gate commands are listed per part (a directory per
+part), a part's commands apply when the diff touches files under that
+directory: run them from that directory, with touched-file paths relative to
+it; also run any "root (always)" command. Parts the diff doesn't touch are
+skipped; say which parts you ran.
+
 You will be given, in the prompt: the task/plan file paths, the branch and the
 base ref. `git diff <base>...HEAD` shows exactly what `coder` changed.
 

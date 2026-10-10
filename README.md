@@ -34,6 +34,14 @@ confirmation writes it into `CLAUDE.md`, adds the docs skeleton
 ADR, flags same-named `.claude/agents/` copies that would shadow the plugin, and
 offers a `develop` branch. It pushes or opens a PR only after you say yes.
 
+Stack detection: CI commands first, then what the project declares (scripts,
+Makefile targets, tool configs), then a built-in stack table (Python uv/Poetry/
+pip, JS/TS pnpm/yarn/npm/bun, Go, Rust, Java/Kotlin, .NET, Ruby, PHP) as marked
+guesses; every gate command is run once before it is written. An empty repo
+gets a short survey with a recommended toolset (and optional scaffolding); a
+monorepo gets per-part gate commands (directory → commands), which `coder`,
+`tester` and `qa-mr` run only for the parts a diff touches.
+
 ## Install (user scope = every project)
 
 The scratchpad is temporary. Move the directory somewhere permanent first,
