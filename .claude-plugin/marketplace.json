@@ -2,6 +2,7 @@
   "name": "gronck-local",
   "description": "Personal plugins: the shared subagent dev pipeline",
   "owner": { "name": "Gronck" },
+  "allowCrossMarketplaceDependenciesOn": ["ponytail"],
   "plugins": [
     {
       "name": "dev-pipeline",
