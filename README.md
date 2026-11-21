@@ -7,7 +7,7 @@ The agents hold only the generic workflow; everything project-specific comes
 from a `## Pipeline contract` section in each project's `CLAUDE.md`.
 
 ```
-dev-pipeline-plugin/                 # a local marketplace ("gronck-local")
+claude-plugins/                      # marketplace "gronck-local" (GitHub Gronck2/claude-plugins)
 ├── .claude-plugin/marketplace.json
 └── plugins/dev-pipeline/
     ├── .claude-plugin/plugin.json
@@ -26,11 +26,11 @@ dev-pipeline-plugin/                 # a local marketplace ("gronck-local")
 - Every `code-reviewer` pass is the next round, whatever triggered it. Review
   rounds count toward the cap of 3 retry cycles per task.
 
-## ponytail (optional)
+## ponytail
 
-With the [ponytail](https://github.com/DietrichGebert/ponytail) plugin
-installed (`ponytail@ponytail`), the pipeline also checks for code that
-shouldn't exist:
+The [ponytail](https://github.com/DietrichGebert/ponytail) plugin
+(`ponytail@ponytail`) is a dependency and installs with `dev-pipeline` (see
+Install). The pipeline uses it to check for code that shouldn't exist:
 
 - `coder` and `tester` follow ponytail's smallest-complete-change rules. The
   key rules are copied into the agents, so they apply without the plugin too.
@@ -63,24 +63,44 @@ monorepo gets per-part gate commands (directory → commands), which `coder`,
 
 ## Install (user scope = every project)
 
-The scratchpad is temporary. Move the directory somewhere permanent first,
-because a marketplace added from a local path is loaded in place:
+The marketplace is the private GitHub repo `Gronck2/claude-plugins`; git
+clones it with the machine's own credentials (SSH key or `gh auth setup-git`).
+`ponytail` comes from another marketplace, which a dependency does not add by
+itself, so add it first:
 
 ```bash
-mv <scratchpad>/dev-pipeline-plugin ~/claude-plugins
-claude plugin validate ~/claude-plugins
-claude plugin marketplace add ~/claude-plugins
-claude plugin install dev-pipeline@gronck-local          # --scope user is the default
-claude plugin list                                       # dev-pipeline@gronck-local  ✔ enabled
+claude plugin marketplace add DietrichGebert/ponytail
+claude plugin marketplace add Gronck2/claude-plugins     # registers as "gronck-local"
+claude plugin install dev-pipeline@gronck-local          # --scope user is the default; pulls ponytail@ponytail
+claude plugin list                                       # dev-pipeline and ponytail  ✔ enabled
 ```
 
-`install` writes `"dev-pipeline@gronck-local": true` under `enabledPlugins` in
-`~/.claude/settings.json`. The agents appear as `dev-pipeline:coder`, etc.,
-and the skill as `/dev-pipeline:run-task`. Edits to the files take effect at the
-next session or after `/reload-plugins`.
+`plugin.json` declares `"dependencies": ["ponytail@ponytail"]` and
+`marketplace.json` allows it with `allowCrossMarketplaceDependenciesOn`.
+Without the ponytail marketplace, `dev-pipeline` installs but fails to load
+("Dependency ponytail@ponytail is not installed"); adding the marketplace
+afterwards installs it.
 
-Later you can push `~/claude-plugins` to a private GitHub repo and add it with
-`claude plugin marketplace add <owner>/<repo>` on other machines.
+**Auto-update.** Turn it on once per machine in `~/.claude/settings.json`:
+
+```json
+"extraKnownMarketplaces": {
+  "gronck-local": {
+    "source": { "source": "github", "repo": "Gronck2/claude-plugins" },
+    "autoUpdate": true
+  }
+}
+```
+
+`plugin.json` has no `version`, so the version is the commit SHA and every
+commit on `main` is an update. An interactive session refreshes the
+marketplace a few minutes after its first message and updates the plugin on
+disk; sessions load it at their next start or `/reload-plugins`. Right away:
+`claude plugin marketplace update gronck-local && claude plugin update dev-pipeline@gronck-local`.
+
+The agents appear as `dev-pipeline:coder`, etc., and the skill as
+`/dev-pipeline:run-task`. To try local edits before merging, start a session
+with `claude --plugin-dir ~/claude-plugins/plugins/dev-pipeline`.
 
 ## Exclude one project
 
