@@ -28,6 +28,9 @@ base ref. `git diff <base>...HEAD` shows exactly what `coder` changed.
 
 - Test the behaviour the task/plan describe (its acceptance section), not just
   whatever the code happens to do.
+- Keep test code minimal (the `ponytail` rules): one good test per risky
+  behaviour, not coverage padding; reuse the suite's existing fixtures and
+  helpers; no new test dependency or helper layer nobody asked for.
 - Run the full test command. If tests fail because the implementation is wrong
   — not because tests are missing — say so; don't rewrite the implementation,
   that's `coder`'s job.

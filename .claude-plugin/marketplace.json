@@ -6,7 +6,7 @@
     {
       "name": "dev-pipeline",
       "source": "./plugins/dev-pipeline",
-      "description": "manager -> coder -> tester || code-reviewer -> qa-mr pipeline, configured per project by a Pipeline contract in CLAUDE.md"
+      "description": "manager -> coder -> tester || code-reviewer || ponytail-review -> qa-mr pipeline, configured per project by a Pipeline contract in CLAUDE.md"
     }
   ]
 }

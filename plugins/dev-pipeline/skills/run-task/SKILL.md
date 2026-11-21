@@ -1,14 +1,15 @@
 ---
 name: run-task
 description: >
-  Runs the manager -> coder -> tester || code-reviewer -> qa-mr dev pipeline for
+  Runs the manager -> coder -> tester || code-reviewer || ponytail-review -> qa-mr dev pipeline for
   one task. Use when the user says "/run-task", "запусти задачу", "начни
   пайплайн для X", or asks to run the agent pipeline on a task. Args: a fresh
   task description (not yet recorded) or a reference to an existing task file.
 ---
 
 Orchestrate the `dev-pipeline` agents: `manager`, `coder`, `tester`,
-`code-reviewer`, `qa-mr`. You (the main thread) drive every step; the subagents
+`code-reviewer`, `qa-mr`, plus the optional `ponytail-review` skill (plugin
+`ponytail`). You (the main thread) drive every step; the subagents
 don't call each other or share your conversation, so every prompt is
 self-contained.
 
@@ -39,24 +40,40 @@ plugin README). Don't guess.
 4. **Implement.** Invoke `coder`: task/plan paths, branch, base ref, and on a
    retry the prior failure reason.
 5. **Test and review in parallel.** On `coder` `SUCCESS`, launch `tester` and
-   `code-reviewer` together. `code-reviewer` gets
+   `code-reviewer` together in the background. `code-reviewer` gets
    `git diff <base>...HEAD -- . <one ':(exclude)<glob>' per Test paths entry>`
    (e.g. `':(exclude)tests'`, `':(exclude)**/*.test.ts'`), is read-only and never
    runs the suite; name any security-shaped path from the contract that the
    diff touches, and the **review round**: 1 on the first pass, +1 on every
    later `code-reviewer` pass for this task, whatever triggered it (review
-   findings, a `tester`/`qa-mr` BLOCKED, a deep review). Wait for both.
+   findings, a `tester`/`qa-mr` BLOCKED, a deep review).
+   **ponytail-review** (lean / over-engineering review): while both agents
+   run, if your skills list has `ponytail:ponytail-review` (or a bare
+   `ponytail-review`), invoke it yourself with the Skill tool on the same
+   diff scope as `code-reviewer`. It runs inline in your thread, so ask in
+   the args for the findings only, grouped Must fix / Should fix / Nice to
+   have with `file:line`, plus the `Verdict:` line, no restatement of the
+   diff. Skill missing: skip it, note `ponytail-review: skipped (not
+   installed)` in the progress report, and go on. Wait for all of them.
    **Review findings are mandatory** (the reviewer writes caveman-style, one
-   line per finding):
-   - Rounds 1 and 2: every finding (`🔴`, `🟡`, `🔵`, `❓`) goes back to a fresh
-     `coder` call without asking the user (answer a `❓` yourself from the
-     task/plan when you can; otherwise ask the user first), then step 5 again
-     as the next round.
+   line per finding). ponytail-review's **Must fix** and **Should fix**
+   findings join `code-reviewer`'s in the same `coder` call and the same
+   round; its **Nice to have** findings never block: list them in the final
+   report.
+   - Rounds 1 and 2: every finding (`🔴`, `🟡`, `🔵`, `❓`, ponytail Must/Should)
+     goes back to a fresh `coder` call without asking the user (answer a `❓`
+     yourself from the task/plan when you can; otherwise ask the user first),
+     then step 5 again as the next round.
    - Round 3: `🔵 nit` findings are always skipped (the reviewer doesn't report
-     them). Any other finding goes to the user, who decides per finding: fix
-     (one more `coder` call + step 5) or follow-up task / accept.
-6. **Gate.** Invoke `qa-mr` once `tester` says `SUCCESS` and `code-reviewer`
-   says `REVIEW_CLEAN` (or the user has decided every round-3 finding). On
+     them). Any other finding, ponytail Must/Should included, goes to the
+     user, who decides per finding: fix (one more `coder` call + step 5) or
+     follow-up task / accept.
+6. **Gate.** Invoke `qa-mr` once `tester` says `SUCCESS`, `code-reviewer`
+   says `REVIEW_CLEAN` and ponytail-review has no open Must/Should finding
+   (or the user has decided every round-3 finding). Pass `qa-mr` the
+   ponytail-review result: its `Verdict:` line plus every Must/Should finding
+   with what happened to it (fixed / user accepted / deferred), or
+   `ponytail-review: skipped (not installed)`. On
    `RECOMMEND_DEEP_REVIEW`, run one more `code-reviewer` pass over the full
    diff, tests included; its findings follow the same round rules.
 7. **Retry on BLOCKED.** `BLOCKED` from `coder`, `tester` or `qa-mr` → fresh
@@ -69,8 +86,9 @@ plugin README). Don't guess.
    branch and open the PR into the contract's PR target with `qa-mr`'s
    title/body and the contract's Forge (`gh pr create` / `glab mr create`),
    without asking. Forge `none`: stop after `READY_FOR_MR`, show the draft and
-   leave the branch local. Report the link, a diff summary and any round-3
-   findings the user chose to accept or defer.
+   leave the branch local. Report the link, a diff summary, any round-3
+   findings the user chose to accept or defer, and ponytail-review's Nice to
+   have findings (or that it was skipped).
 
 ## Always
 

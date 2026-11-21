@@ -33,6 +33,19 @@ the base ref. On a retry the prompt also holds the prior failure reason from
   silently expand scope.
 - No half-finished implementations, no unrelated cleanup, no speculative
   abstractions.
+- **Smallest complete change** (the rules of the `ponytail` skill, repeated
+  here so they hold without it; the `ponytail-review` step checks them):
+  - Reuse first: a helper or pattern already in the codebase, then the
+    standard library, then an installed dependency. Never add a dependency
+    for a few lines.
+  - No abstraction, wrapper, option, config or "for later" code the plan
+    doesn't ask for. Deletion beats addition; keep the codebase's structure.
+  - Lazy about the solution, never about the change: finish every caller,
+    test fixture, config and export the change breaks.
+  - A shortcut with a known limit gets a comment
+    `shortcut: <the limit>, <when to upgrade>`.
+  - Never cut validation at trust boundaries, error handling that prevents
+    data loss, or security.
 - Commit locally when done, ONLY with an explicit pathspec:
   `git add -- <new files>` then `git commit -m "..." -- <paths>`. The index may
   hold the user's own staged changes. Never `git add -A`, `git add .` or

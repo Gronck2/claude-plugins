@@ -1,7 +1,8 @@
 # dev-pipeline plugin (draft)
 
 One subagent pipeline for every project: `manager` → `coder` →
-`tester` ∥ `code-reviewer` → `qa-mr`, plus the `run-task` skill that drives it.
+`tester` ∥ `code-reviewer` ∥ `ponytail-review` → `qa-mr`, plus the `run-task`
+skill that drives it.
 The agents hold only the generic workflow; everything project-specific comes
 from a `## Pipeline contract` section in each project's `CLAUDE.md`.
 
@@ -24,6 +25,24 @@ dev-pipeline-plugin/                 # a local marketplace ("gronck-local")
   skipped; every other finding is put to the user (fix / follow-up / accept).
 - Every `code-reviewer` pass is the next round, whatever triggered it. Review
   rounds count toward the cap of 3 retry cycles per task.
+
+## ponytail (optional)
+
+With the [ponytail](https://github.com/DietrichGebert/ponytail) plugin
+installed (`ponytail@ponytail`), the pipeline also checks for code that
+shouldn't exist:
+
+- `coder` and `tester` follow ponytail's smallest-complete-change rules. The
+  key rules are copied into the agents, so they apply without the plugin too.
+- `run-task` invokes the `ponytail-review` skill itself (inline, findings
+  only) on the same diff as `code-reviewer`, while `tester` and
+  `code-reviewer` run. Its **Must fix** / **Should fix** findings go into the
+  same `coder` fix cycle and round as `code-reviewer`'s; **Nice to have**
+  findings never block and are listed in the final report.
+- `qa-mr` gets the ponytail-review result and fails the gate if a Must/Should
+  finding is still open (not fixed and not accepted by the user).
+- Without the plugin the step is skipped with `ponytail-review: skipped (not
+  installed)` in the report; nothing else changes.
 
 ## Start a new project: `/dev-pipeline:setup-project`
 
